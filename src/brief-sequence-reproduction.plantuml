@@ -1,0 +1,58 @@
+' Reproduction approximative du diagramme de séquence :
+' Lancer l'aperçu avec Alt + D
+
+@startuml DevFlash
+
+actor Client
+
+participant "index.ts" as ServeurExpress
+participant "router.ts"
+participant "validation"
+participant "auth.controller.ts"
+participant "auth.service.ts"
+participant "user.repository.ts"
+database "PostgreSQL"
+
+Client -> ServeurExpress : POST /auth/signup (email, password)
+
+ServeurExpress -> router.ts : délègue la requête
+
+router.ts -> validation : validateSignup(req, res, next)
+
+alt
+
+validation --> Client : 400 Bad Request {error}
+
+validation -> auth.controller.ts : next()
+
+auth.controller.ts -> auth.service.ts : signup(email, password)
+
+auth.service.ts -> user.repository.ts : findByEmail(email)
+
+user.repository.ts -> PostgreSQL : SELECT ... WHERE email = $1
+
+PostgreSQL --> user.repository.ts : 0 ou 1 ligne
+
+user.repository.ts --> auth.service.ts : User | null
+
+alt
+
+auth.service.ts --> auth.controller.ts :throw EmailAlreadyUsedError
+
+auth.controller.ts --> Client : 409 Conflict
+
+auth.service.ts -> auth.service.ts : argon2.hash(password)
+
+auth.service.ts -> user.repository.ts : create({email, passwordHash})
+
+user.repository.ts -> PostgreSQL : INSERT INTO users
+
+PostgreSQL --> user.repository.ts : ligne créée
+
+user.repository.ts --> auth.service.ts : User
+
+auth.service.ts --> auth.controller.ts : {id, email}
+
+auth.controller.ts --> Client : 200 OK {message : "Inscription réussie"
+
+@enduml
